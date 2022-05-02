@@ -152,7 +152,7 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				fmt.Println("当前购物车中无有效商品")
+				fmt.Println(time.Now().Format("2006-01-02 15:04:05") + " - 当前购物车中无有效商品")
 			}
 			if errors.Is(err, dd.LimitedErr1) {
 				time.Sleep(1 * time.Second)
