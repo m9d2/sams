@@ -43,17 +43,17 @@ type DingdongSession struct {
 }
 
 func (s *DingdongSession) InitSession(conf Config) error {
-	fmt.Println("########## 初始化 ##########")
+	fmt.Println("初始化")
 	s.Client = &http.Client{Timeout: 60 * time.Second}
 	s.Conf = conf
 
 	if len(s.Conf.PromotionId) > 0 {
-		fmt.Println("########## 当前选择优惠券 ##########")
+		fmt.Println("当前选择优惠券")
 		for k, id := range s.Conf.PromotionId {
 			fmt.Printf("[%d] %s\n", k, id)
 		}
 	} else {
-		fmt.Println("########## 当前没有选择优惠券 ##########")
+		fmt.Println("当前没有选择优惠券")
 	}
 	stdin := bufio.NewReader(os.Stdin)
 
@@ -74,7 +74,7 @@ func (s *DingdongSession) InitSession(conf Config) error {
 		}
 	}
 	if s.Address.AddressId == "" {
-		fmt.Println("########## 选择收货地址 ##########")
+		fmt.Println("选择收货地址")
 		for i, addr := range addrList {
 			fmt.Printf("[%v] %s %s %s %s %s \n", i, addr.Name, addr.DistrictName, addr.ReceiverAddress, addr.DetailAddress, addr.Mobile)
 		}
@@ -93,7 +93,7 @@ func (s *DingdongSession) InitSession(conf Config) error {
 		s.Address = addrList[index]
 	}
 
-	fmt.Println("########## 选择支付方式 ##########")
+	fmt.Println("选择支付方式")
 	switch s.Conf.PayMethod {
 	case 1:
 		fmt.Println("支付方式 : wechat ")

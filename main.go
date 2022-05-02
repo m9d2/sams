@@ -23,6 +23,7 @@ var (
 	promotionId  = flag.String("promotionId", "", "可选，优惠券id,多个用逗号隔开，山姆app优惠券列表接口中的'ruleId'字段")
 	addressId    = flag.String("addressId", "", "可选，地址id")
 	payMethod    = flag.Int("payMethod", 1, "可选，1,微信 2,支付宝")
+	mobile       = flag.String("mobile", "", "可选")
 )
 
 func main() {
@@ -68,7 +69,7 @@ func main() {
 
 	for true {
 	SaveDeliveryAddress:
-		fmt.Println("########## 切换购物车收货地址 ###########")
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05") + " - 切换购物车收货地址")
 		err = session.SaveDeliveryAddress()
 		if err != nil {
 			goto SaveDeliveryAddress
@@ -77,7 +78,7 @@ func main() {
 			fmt.Printf("%s %s %s %s %s \n", session.Address.Name, session.Address.DistrictName, session.Address.ReceiverAddress, session.Address.DetailAddress, session.Address.Mobile)
 		}
 	StoreLoop:
-		fmt.Println("########## 获取地址附近可用商店 ###########")
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05") + " - 获取地址附近可用商")
 		stores, err := session.CheckStore()
 		if err != nil {
 			fmt.Printf("%s", err)
@@ -91,7 +92,7 @@ func main() {
 			}
 		}
 	CartLoop:
-		fmt.Printf("########## 获取购物车中有效商品【%s】 ###########\n", time.Now().Format("15:04:05"))
+		fmt.Printf("%s - 获取购物车中有效商品", time.Now().Format("2006-01-02 15:04:05"))
 		err = session.CheckCart()
 		for _, v := range session.Cart.FloorInfoList {
 			if v.FloorId == session.Conf.FloorId {
@@ -159,7 +160,7 @@ func main() {
 			goto StoreLoop
 		}
 	GoodsLoop:
-		fmt.Printf("########## 开始校验当前商品【%s】 ###########\n", time.Now().Format("15:04:05"))
+		fmt.Printf("%s - 开始校验当前商品\n", time.Now().Format("2006-01-02 15:04:05"))
 		if err = session.CheckGoods(); err != nil {
 			fmt.Println(err)
 			time.Sleep(1 * time.Second)
@@ -185,7 +186,7 @@ func main() {
 			}
 		}
 	CapacityLoop:
-		fmt.Printf("########## 获取当前可用配送时间【%s】 ###########\n", time.Now().Format("15:04:05"))
+		fmt.Printf("%s - 获取当前可用配送时间\n", time.Now().Format("2006-01-02 15:04:05"))
 		err = session.CheckCapacity()
 		if err != nil {
 			fmt.Println(err)
@@ -220,14 +221,14 @@ func main() {
 	OrderLoop:
 		for len(session.SettleDeliveryInfo) > 0 {
 			for k, v := range session.SettleDeliveryInfo {
-				fmt.Printf("########## 提交订单中【%s】 ###########\n", time.Now().Format("15:04:05"))
+				fmt.Printf("%s - 提交订单中\n", time.Now().Format("2006-01-02 15:04:05"))
 				fmt.Printf("配送时段: %s!\n", v.ArrivalTimeStr)
 				err = session.CommitPay(v)
 				if err == nil {
-					fmt.Println("抢购成功，请前往app付款！")
+					fmt.Println("%s - 抢购成功，请前往app付款！\n", time.Now().Format("2006-01-02 15:04:05"))
 					if session.Conf.BarkId != "" {
 						for true {
-							err = session.PushSuccess(fmt.Sprintf("Smas抢单成功，订单号：%s", session.OrderInfo.OrderNo))
+							err = session.PushSuccess(fmt.Sprintf("Smas抢单成功，订单号：%s，手机号：%s", session.OrderInfo.OrderNo, *mobile))
 							if err == nil {
 								break
 							} else {
