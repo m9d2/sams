@@ -92,7 +92,7 @@ func main() {
 			}
 		}
 	CartLoop:
-		fmt.Printf("%s - 获取购物车中有效商品", time.Now().Format("2006-01-02 15:04:05"))
+		fmt.Printf("%s - 获取购物车中有效商品\n", time.Now().Format("2006-01-02 15:04:05"))
 		err = session.CheckCart()
 		for _, v := range session.Cart.FloorInfoList {
 			if v.FloorId == session.Conf.FloorId {
