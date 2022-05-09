@@ -125,14 +125,19 @@ func main() {
 					}
 				}
 
-				//for _, goods := range v.AllOutOfStockGoodsList {
-				//	if goods.StockQuantity > 0 && goods.StockStatus && goods.IsPutOnSale && goods.IsAvailable {
-				//		if goods.StockQuantity <= goods.Quantity {
-				//			goods.Quantity = goods.StockQuantity
-				//		}
-				//		session.GoodsList = append(session.GoodsList, goods.ToGoods())
-				//	}
-				//}
+				for _, goods := range v.AllOutOfStockGoodsList {
+					if goods.StockQuantity > 0 && goods.StockStatus && goods.IsPutOnSale && goods.IsAvailable {
+						if goods.StockQuantity <= goods.Quantity {
+							goods.Quantity = goods.StockQuantity
+						}
+
+						if session.Conf.CheckGoods && goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
+							goods.Quantity = goods.LimitNum
+						}
+
+						session.GoodsList = append(session.GoodsList, goods.ToGoods())
+					}
+				}
 
 				session.FloorInfo = v
 				session.DeliveryInfoVO = dd.DeliveryInfoVO{
@@ -255,7 +260,7 @@ func main() {
 					case dd.LimitedErr1:
 						fmt.Println("立即重试...")
 						goto OrderLoop
-					case dd.OOSErr, dd.PreGoodNotStartSellErr, dd.CartGoodChangeErr:
+					case dd.OOSErr, dd.PreGoodNotStartSellErr, dd.CartGoodChangeErr, dd.GoodsExceedLimitErr:
 						goto CartLoop
 					case dd.StoreHasClosedError:
 						goto StoreLoop
