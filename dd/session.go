@@ -24,7 +24,7 @@ type Config struct {
 	AddressId    string
 	PayMethod    int //支付方式
 	DeliveryFee  bool
-	CheckGoods   bool
+	StoreConf    string
 }
 
 type DingdongSession struct {
@@ -33,13 +33,11 @@ type DingdongSession struct {
 	Uid                string                     `json:"uid"`
 	Capacity           Capacity                   `json:"capacity"`
 	Channel            string                     `json:"channel"` //0 => wechat  1 =>alipay
-	SettleInfo         SettleInfo                 `json:"settleInfo"`
 	DeliveryInfoVO     DeliveryInfoVO             `json:"deliveryInfoVO"`
 	SettleDeliveryInfo map[int]SettleDeliveryInfo `json:"settleDeliveryInfo"`
 	GoodsList          []Goods                    `json:"goods"`
 	FloorInfo          FloorInfo                  `json:"floorInfo"`
 	StoreList          map[string]Store           `json:"store"`
-	OrderInfo          OrderInfo                  `json:"orderInfo"`
 	Client             *http.Client               `json:"client"`
 	Cart               Cart                       `json:"cart"`
 }

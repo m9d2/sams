@@ -4,8 +4,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/robGoods/sams/dd"
 )
@@ -25,7 +29,7 @@ var (
 	payMethod    = flag.Int("payMethod", 1, "可选，1,微信 2,支付宝")
 	mobile       = flag.String("mobile", "", "可选")
 	deliveryFee  = flag.Bool("deliveryFee", false, "可选，是否免运费下单")
-	checkGoods   = flag.Bool("checkGoods", true, "可选，是否校验商品限购")
+	storeConf    = flag.String("storeConf", "", "可选，是否预加载商店信息")
 )
 
 func main() {
@@ -61,7 +65,7 @@ func main() {
 		AddressId:    *addressId,                                //地址
 		PayMethod:    *payMethod,                                //支付方式
 		DeliveryFee:  *deliveryFee,
-		CheckGoods:   *checkGoods,
+		StoreConf:    *storeConf,
 	}
 
 	err := session.InitSession(conf)
@@ -80,6 +84,37 @@ func main() {
 		} else {
 			fmt.Println("切换成功!")
 			fmt.Printf("%s %s %s %s %s \n", session.Address.Name, session.Address.DistrictName, session.Address.ReceiverAddress, session.Address.DetailAddress, session.Address.Mobile)
+		}
+
+		if _, err := os.Stat(session.Conf.StoreConf); err == nil {
+			if file, err := os.Open(session.Conf.StoreConf); err == nil {
+				fmt.Println("########## 预加载商店配置 ###########")
+				var bytes []byte
+				buf := make([]byte, 10)
+				for {
+					n, err := file.Read(buf)
+					if err != nil && err != io.EOF {
+						fmt.Println("read buf fail", err)
+						return
+					}
+					//说明读取结束
+					if n == 0 {
+						break
+					}
+					bytes = append(bytes, buf[:n]...)
+				}
+
+				for index, store := range session.GetStoreList(gjson.ParseBytes(bytes)) {
+					if _, ok := session.StoreList[store.StoreId]; !ok {
+						session.StoreList[store.StoreId] = store
+						fmt.Printf("[%v] Id：%s 名称：%s, 类型 ：%s\n", index, store.StoreId, store.StoreName, store.StoreType)
+					}
+				}
+			} else {
+				fmt.Println(err)
+			}
+		} else {
+			fmt.Println(err)
 		}
 	StoreLoop:
 		fmt.Println(time.Now().Format("2006-01-02 15:04:05") + " - 获取地址附近可用商")
@@ -106,10 +141,17 @@ func main() {
 						if goods.StockQuantity <= goods.Quantity {
 							goods.Quantity = goods.StockQuantity
 						}
-						if session.Conf.CheckGoods && goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
+						if goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
 							goods.Quantity = goods.LimitNum
 						}
-						session.GoodsList = append(session.GoodsList, goods.ToGoods())
+
+						if goods.LimitNum > 0 && goods.Quantity > goods.ResiduePurchaseNum {
+							goods.Quantity = goods.ResiduePurchaseNum
+						}
+
+						if goods.Quantity > 0 {
+							session.GoodsList = append(session.GoodsList, goods.ToGoods())
+						}
 					}
 				}
 
@@ -118,10 +160,16 @@ func main() {
 						if goods.StockQuantity <= goods.Quantity {
 							goods.Quantity = goods.StockQuantity
 						}
-						if session.Conf.CheckGoods && goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
+						if goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
 							goods.Quantity = goods.LimitNum
 						}
-						session.GoodsList = append(session.GoodsList, goods.ToGoods())
+						if goods.LimitNum > 0 && goods.Quantity > goods.ResiduePurchaseNum {
+							goods.Quantity = goods.ResiduePurchaseNum
+						}
+
+						if goods.Quantity > 0 {
+							session.GoodsList = append(session.GoodsList, goods.ToGoods())
+						}
 					}
 				}
 
@@ -131,11 +179,17 @@ func main() {
 							goods.Quantity = goods.StockQuantity
 						}
 
-						if session.Conf.CheckGoods && goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
+						if goods.LimitNum > 0 && goods.Quantity > goods.LimitNum {
 							goods.Quantity = goods.LimitNum
 						}
 
-						session.GoodsList = append(session.GoodsList, goods.ToGoods())
+						if goods.LimitNum > 0 && goods.Quantity > goods.ResiduePurchaseNum {
+							goods.Quantity = goods.ResiduePurchaseNum
+						}
+
+						if goods.Quantity > 0 {
+							session.GoodsList = append(session.GoodsList, goods.ToGoods())
+						}
 					}
 				}
 
@@ -170,19 +224,22 @@ func main() {
 		}
 	GoodsLoop:
 		fmt.Printf("%s - 开始校验当前商品\n", time.Now().Format("2006-01-02 15:04:05"))
-		if session.Conf.CheckGoods {
-			if err = session.CheckGoods(); err != nil {
-				fmt.Println(err)
-				time.Sleep(1 * time.Second)
-				switch err {
-				case dd.OOSErr:
-					goto CartLoop
-				default:
-					goto GoodsLoop
-				}
-			}
+		if _, err := session.CheckGoods(); err != nil {
+			fmt.Println(err)
+			//time.Sleep(1 * time.Second)
+			//switch err {
+			//case dd.OOSErr:
+			//	goto CartLoop
+			//default:
+			//	goto GoodsLoop
+			//}
 		}
-		if err = session.CheckSettleInfo(); err != nil {
+		if settleInfo, err := session.CheckSettleInfo(); err == nil {
+			fmt.Printf("运费： %s\n", settleInfo.DeliveryFee)
+			if session.Conf.DeliveryFee && settleInfo.DeliveryFee != "0" {
+				goto CartLoop
+			}
+		} else {
 			fmt.Printf("校验商品失败：%s\n", err)
 			time.Sleep(1 * time.Second)
 			switch err {
@@ -195,15 +252,10 @@ func main() {
 			default:
 				goto GoodsLoop
 			}
-		} else {
-			fmt.Printf("运费： %s\n", session.SettleInfo.DeliveryFee)
-			if session.Conf.DeliveryFee && session.SettleInfo.DeliveryFee != "0" {
-				goto CartLoop
-			}
 		}
 	CapacityLoop:
 		fmt.Printf("%s - 获取当前可用配送时间\n", time.Now().Format("2006-01-02 15:04:05"))
-		err = session.CheckCapacity()
+		capacity, err := session.GetCapacity(session.DeliveryInfoVO.StoreDeliveryTemplateId)
 		if err != nil {
 			fmt.Println(err)
 			time.Sleep(1 * time.Second)
@@ -212,9 +264,8 @@ func main() {
 		}
 
 		session.SettleDeliveryInfo = map[int]dd.SettleDeliveryInfo{}
-		for _, caps := range session.Capacity.CapCityResponseList {
+		for _, caps := range capacity.CapCityResponseList {
 			for _, v := range caps.List {
-				fmt.Printf("配送时间： %s %s - %s, 是否可用：%v\n", caps.StrDate, v.StartTime, v.EndTime, !v.TimeISFull && !v.Disabled)
 				if v.TimeISFull == false && v.Disabled == false {
 					session.SettleDeliveryInfo[len(session.SettleDeliveryInfo)] = dd.SettleDeliveryInfo{
 						ArrivalTimeStr:       fmt.Sprintf("%s %s - %s", caps.StrDate, v.StartTime, v.EndTime),
@@ -239,12 +290,12 @@ func main() {
 			for k, v := range session.SettleDeliveryInfo {
 				fmt.Printf("%s - 提交订单中\n", time.Now().Format("2006-01-02 15:04:05"))
 				fmt.Printf("配送时段: %s!\n", v.ArrivalTimeStr)
-				err = session.CommitPay(v)
-				if err == nil {
+
+				if order, err := session.CommitPay(v); err == nil {
 					fmt.Println("%s - 抢购成功，请前往app付款！\n", time.Now().Format("2006-01-02 15:04:05"))
 					if session.Conf.BarkId != "" {
 						for true {
-							err = session.PushSuccess(fmt.Sprintf("Smas抢单成功，订单号：%s，手机号：%s", session.OrderInfo.OrderNo, *mobile))
+							err = session.PushSuccess(fmt.Sprintf("Smas抢单成功，订单号：%s，手机号：%s", order.OrderNo, *mobile))
 							if err == nil {
 								break
 							} else {
@@ -259,6 +310,8 @@ func main() {
 					switch err {
 					case dd.LimitedErr1:
 						fmt.Println("立即重试...")
+						goto OrderLoop
+					case dd.CloudGoodsOverWightErr:
 						goto OrderLoop
 					case dd.OOSErr, dd.PreGoodNotStartSellErr, dd.CartGoodChangeErr, dd.GoodsExceedLimitErr:
 						goto CartLoop
